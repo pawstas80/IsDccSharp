@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows .NET Framework 4.8
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore .\IsDccSharp.sln
+
+      - name: Build
+        run: dotnet build .\IsDccSharp.sln -c Release --no-restore
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $env:GITHUB_REF_NAME
+          } else {
+            'ci-' + $env:GITHUB_SHA.Substring(0, 7)
+          }
+
+          .\scripts\Package-Release.ps1 -Version $version -SkipBuild
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: IsDccSharp-Windows-net48
+          path: artifacts/*.zip
+          if-no-files-found: error
